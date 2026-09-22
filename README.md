@@ -52,32 +52,40 @@ https://github.com/Reimilia617/Reimilia
 ```binary
 [Reimilia_Binary]
 
-PROJECT_NAME="rtdo"
-
 BINARY_HTTP="https://github.com/Reimilia617/RTDO-Project/releases/rtdo-0.5.0-x86_64-linux"
+REPO_NAME="RTDO-Project"
+FILE_NAME="rtdo"
 
-command {
-    Dl_Bin
-    ...
-}
+bash:
+mkdir ~/.reimilia_cache
+cd ~/.reimilia_cache
+curl -o "$FILE_NAME" "$BINARY_HTTP"
+...
+cd ~
+rm -rf ~/.reimilia_cache
 ```
 ```build
 [Reimilia_Build]
 
-PROJECT_NAME="rtdo"
-
 BUILD_HTTP="https://github.com/Reimilia617/RTDO-Project.git"
+REPO_NAME="RTDO_Project"
 
-command {
-    Git_Repo
-    ...
-}
+bash:
+mkdir ~/.reimilia_cache
+cd ~/.reimilia_cache
+git clone "$BUILD_HTTP"
+cd "$REPO_NAME"
+cargo build --release
+...
+cd ~
+rm -rf ~/.reimilia_cache
+```
 
 后续会完善md文件格式
 
 注意：
 - 若项目需要使用交互式安装，Reimilia暂时不支持，后续考虑加上这个功能，在安装时遇到需要用户选择的地方就弹出窗口提示选择
-- "command"属于Reimilia自己识别用的命令格式，使用时会将"Dl_Bin","Git_Repo"这种专有命令格式转为bash
+- "bash:"需要确保冒号是英文的，且往下的每一行为一条bash代码
 - 预编译二进制安装需要指向releases中的二进制文件，源码安装需要指向git网址
 
 ## 状态
