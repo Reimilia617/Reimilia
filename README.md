@@ -32,5 +32,53 @@ Reimilia的本质就是"调用命令>>读取文件>>下载>>解压"，Python自�
 
 后面做图形界面看看使用GTK还是WebUI，QT一堆依赖不想用。由于和Sakuya为同级别的工具，同时Sakuya需要Reimilia部署，不考虑将Reimilia接入Sakuya
 
+## 关于md文件读取格式
+md文件分为部署器仓库和项目仓库
+
+1. 部署器仓库就是Reimilia的仓库，仓库根目录下存在repo文件夹，里面的md文件的文件名就是需要部署的项目名，同时这个名字会显示在Reimilia内，md文件内部是标准http链接指向项目仓库
+
+示例：
+```repo
+[Reimilia_Repo]
+https://github.com/Reimilia617/Reimilia
+```
+里面的"[Reimilia_Repo]"表示这个md文件就是Reimilia的指向项目仓库格式
+
+2. 项目仓库的根目录需要有一个"Reimilia_Setup"文件夹，里面需要有如下文件
+- "Binary"——使用预编译二进制文件安装
+- "Build"——使用源码编译方式安装
+
+示例：
+```binary
+[Reimilia_Binary]
+
+PROJECT_NAME="rtdo"
+
+BINARY_HTTP="https://github.com/Reimilia617/RTDO-Project/releases/rtdo-0.5.0-x86_64-linux"
+
+command {
+    Dl_Bin
+    ...
+}
+```
+```build
+[Reimilia_Build]
+
+PROJECT_NAME="rtdo"
+
+BUILD_HTTP="https://github.com/Reimilia617/RTDO-Project.git"
+
+command {
+    Git_Repo
+    ...
+}
+
+后续会完善md文件格式
+
+注意：
+- 若项目需要使用交互式安装，Reimilia暂时不支持，后续考虑加上这个功能，在安装时遇到需要用户选择的地方就弹出窗口提示选择
+- "command"属于Reimilia自己识别用的命令格式，使用时会将"Dl_Bin","Git_Repo"这种专有命令格式转为bash
+- 预编译二进制安装需要指向releases中的二进制文件，源码安装需要指向git网址
+
 ## 状态
 项目仍在设计阶段，README会持续更新
