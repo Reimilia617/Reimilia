@@ -52,6 +52,7 @@ https://github.com/Reimilia617/Reimilia
 ```binary
 [Reimilia_Binary]
 
+BUILD_LANG="rust"
 BINARY_HTTP="https://github.com/Reimilia617/RTDO-Project/releases/rtdo-0.5.0-x86_64-linux"
 FILE_NAME="rtdo"
 
@@ -66,6 +67,7 @@ rm -rf ~/.reimilia_cache
 ```build
 [Reimilia_Build]
 
+BUILD_LANG="rust"
 BUILD_HTTP="https://github.com/Reimilia617/RTDO-Project.git"
 REPO_NAME="RTDO_Project"
 
