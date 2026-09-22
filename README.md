@@ -53,7 +53,6 @@ https://github.com/Reimilia617/Reimilia
 [Reimilia_Binary]
 
 BINARY_HTTP="https://github.com/Reimilia617/RTDO-Project/releases/rtdo-0.5.0-x86_64-linux"
-REPO_NAME="RTDO-Project"
 FILE_NAME="rtdo"
 
 bash:
