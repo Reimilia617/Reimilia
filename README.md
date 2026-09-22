@@ -116,7 +116,7 @@ rm -rf ~/.reimilia_cache
 
 - 如果需要关闭签名验证，只需要点击"关闭验证"，然后还不行，还需要去Reimilia运行目录下找到Rule.txt，将里面的false改成true即可，一旦同意了这个文件，通过Reimilia下载的文件内含恶意代码或挖矿病毒导致电脑成为矿机，则Reimilia原作者概不负责！！！
 
-- 注意，Rule.txt中"flase"代表未确认取消验证，"true"代表同意取消验证，不要弄错了！！！
+- 注意，Rule.txt中~~"flase"~~"false"(啊啊啊，怎么还拼写错误了QAQ)代表未确认取消验证，"true"代表同意取消验证，不要弄错了！！！
 
 5. 我打算加个检测
 - 就是如果运行的是我的官方版Reimilia，则运行时会提示"您现在运行的是由"Github@Reimilia617"编译的Reimilia"
