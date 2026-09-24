@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# PyInstaller 构建产物
+build/
+dist/
+*.manifest
+
+# 打包用虚拟环境
+.venv-build/
+.venv/
+
+# 本地运行状态（正常情况下在 ~/.reimilia，这里兜底）
+.reimilia/

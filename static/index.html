@@ -8,7 +8,7 @@
   :root {
     --bg:#0f1115; --panel:#171a21; --panel-2:#1e222b; --border:#2a2f3a;
     --text:#e6e8ee; --muted:#8a92a6; --accent:#5b8cff; --accent-hover:#7ba2ff;
-    --ok:#4caf7d; --err:#ff6b6b;
+    --ok:#4caf7d; --warn:#e0b341; --err:#ff6b6b;
   }
   * { box-sizing: border-box; }
   body {
@@ -17,16 +17,23 @@
                 "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
   }
   header {
-    display:flex; align-items:center; justify-content:space-between;
+    display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
     padding:16px 24px; border-bottom:1px solid var(--border); background:var(--panel);
   }
   header h1 { margin:0; font-size:18px; font-weight:600; }
   header h1 span { color:var(--accent); }
+  .meta { font-size:11px; color:var(--muted); margin-top:4px; word-break:break-all; }
+  .controls { display:flex; align-items:center; gap:10px; }
+  label.kind { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+  select {
+    background:var(--panel-2); color:var(--text); border:1px solid var(--border);
+    border-radius:6px; padding:6px 8px; font-size:12px;
+  }
   button {
     background:var(--accent); color:#fff; border:0; border-radius:6px;
     padding:8px 14px; font-size:13px; cursor:pointer; transition:background .15s;
   }
-  button:hover { background:var(--accent-hover); }
+  button:hover:not(:disabled) { background:var(--accent-hover); }
   button:disabled { background:var(--panel-2); color:var(--muted); cursor:not-allowed; }
   main {
     display:grid; grid-template-columns:minmax(320px,1fr) minmax(400px,1.3fr);
@@ -41,36 +48,50 @@
     margin:0 0 12px; font-size:12px; font-weight:600; color:var(--muted);
     text-transform:uppercase; letter-spacing:.08em;
   }
-  #project-list {
-    list-style:none; margin:0; padding:0; overflow-y:auto; max-height:70vh;
-  }
+  #project-list { list-style:none; margin:0; padding:0; overflow-y:auto; max-height:70vh; }
   #project-list li {
     display:grid; grid-template-columns:1fr auto; align-items:center; gap:12px;
-    padding:10px 12px; border-radius:8px; background:var(--panel-2);
-    margin-bottom:8px;
+    padding:10px 12px; border-radius:8px; background:var(--panel-2); margin-bottom:8px;
   }
   #project-list .name { font-weight:600; }
-  #project-list .url  {
-    grid-column:1 / 2; font-size:11px; color:var(--muted); word-break:break-all;
-  }
+  #project-list .url  { grid-column:1 / 2; font-size:11px; color:var(--muted); word-break:break-all; }
   #log-output {
     flex:1; margin:0; padding:12px; background:#0a0c10; border-radius:8px;
     font-family:ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     font-size:12px; line-height:1.5; color:#cdd3e0; overflow-y:auto;
     max-height:70vh; white-space:pre-wrap; word-break:break-all;
   }
+  #log-output .warn  { color:var(--warn); }
+  #log-output .error { color:var(--err); }
+  #log-output .stage { color:var(--accent); }
+  #log-output .ok    { color:var(--ok); }
   .status-err { color:var(--err); }
+  .hint { font-size:11px; color:var(--muted); margin-top:10px; line-height:1.6; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Reimilia <span>WebUI</span></h1>
-  <button id="refresh">刷新项目列表</button>
+  <div>
+    <h1>Reimilia <span>WebUI</span></h1>
+    <div class="meta" id="meta">加载中…</div>
+  </div>
+  <div class="controls">
+    <label class="kind">安装方式
+      <select id="kind">
+        <option value="auto">自动（按顺序回退）</option>
+        <option value="build">Build（源码编译）</option>
+        <option value="binary">Binary（预编译）</option>
+      </select>
+    </label>
+    <button id="refresh">刷新项目列表</button>
+  </div>
 </header>
 <main>
   <section>
     <h2>可部署项目</h2>
     <ul id="project-list"><li>加载中…</li></ul>
+    <p class="hint">部署目标由服务端按项目名解析，前端无法指定任意仓库。<br>
+       需要 root 的步骤会在启动 Reimilia 的终端里提示输入密码。</p>
   </section>
   <section>
     <h2>部署日志</h2>
@@ -81,20 +102,30 @@
 <script>
   const listEl     = document.getElementById('project-list');
   const logEl      = document.getElementById('log-output');
+  const metaEl     = document.getElementById('meta');
+  const kindEl     = document.getElementById('kind');
   const refreshBtn = document.getElementById('refresh');
   let activeES     = null;
+  let deploying    = false;
+
+  const escapeHtml = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+  async function loadStatus() {
+    try {
+      const data = await (await fetch('/api/status')).json();
+      metaEl.textContent =
+        `v${data.version} · 仓库 ${data.remote_repo} · 顺序 ${data.install_order.join(' → ')}` +
+        ` · 状态目录 ${data.state_dir}`;
+    } catch { metaEl.textContent = '配置读取失败'; }
+  }
 
   async function loadProjects(force = false) {
     listEl.innerHTML = '<li>加载中…</li>';
     try {
-      const res  = await fetch('/api/projects' + (force ? '?refresh=1' : ''));
-      const data = await res.json();
+      const data = await (await fetch('/api/projects' + (force ? '?refresh=1' : ''))).json();
       if (!data.ok) throw new Error(data.error || '未知错误');
       const entries = Object.entries(data.projects);
-      if (!entries.length) {
-        listEl.innerHTML = '<li>未找到可部署的项目</li>';
-        return;
-      }
+      if (!entries.length) { listEl.innerHTML = '<li>未找到可部署的项目</li>'; return; }
       listEl.innerHTML = '';
       for (const [name, url] of entries) {
         const li = document.createElement('li');
@@ -109,34 +140,34 @@
 
         const btn = document.createElement('button');
         btn.textContent = '部署';
-        btn.onclick = () => startDeploy(name, url, btn);
-
+        btn.onclick = () => startDeploy(name, btn);
         li.append(info, btn);
         listEl.appendChild(li);
       }
     } catch (e) {
-      listEl.innerHTML =
-        `<li class="status-err">加载失败: ${e.message}</li>`;
+      listEl.innerHTML = `<li class="status-err">加载失败: ${escapeHtml(e.message)}</li>`;
     }
   }
 
-  async function startDeploy(name, url, btn) {
-    btn.disabled = true;
+  async function startDeploy(name, btn) {
+    if (deploying) return;
+    deploying = true;
+    setButtonsEnabled(false);
     btn.textContent = '部署中';
     logEl.textContent = `=== 开始部署 ${name} ===\n`;
     try {
       const res = await fetch('/api/deploy', {
-        method : 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body   : JSON.stringify({ project: name, url }),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project: name, kind: kindEl.value }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || '启动失败');
+      appendLog(`仓库: ${data.repo}\n`, 'stage');
       streamLogs(data.task_id);
     } catch (e) {
-      appendLog(`错误: ${e.message}\n`);
-      btn.disabled = false;
-      btn.textContent = '部署';
+      appendLog(`错误: ${e.message}\n`, 'error');
+      finishDeploy();
     }
   }
 
@@ -148,31 +179,53 @@
     es.onmessage = ev => {
       try {
         const item = JSON.parse(ev.data);
-        if (item.type === 'log') appendLog(item.msg + '\n');
+        if (item.type === 'log') {
+          appendLog(item.msg + '\n', item.level);
+        } else if (item.type === 'stage') {
+          appendLog(`[${item.stage}] ${item.kind || item.project}\n`, 'stage');
+        }
       } catch {}
     };
 
-    es.addEventListener('end', () => {
-      appendLog('\n=== 会话结束 ===\n');
+    es.addEventListener('end', ev => {
+      let ok = false;
+      try { ok = JSON.parse(ev.data).ok === true; } catch {}
+      appendLog(ok ? '\n=== 部署成功 ===\n' : '\n=== 部署结束（未成功）===\n', ok ? 'ok' : 'error');
       es.close();
       activeES = null;
-      document.querySelectorAll('#project-list button')
-        .forEach(b => { b.disabled = false; b.textContent = '部署'; });
+      finishDeploy();
     });
 
     es.onerror = () => {
-      appendLog('\n[连接中断]\n');
+      appendLog('\n[连接中断]\n', 'error');
       es.close();
       activeES = null;
+      finishDeploy();
     };
   }
 
-  function appendLog(text) {
-    logEl.textContent += text;
+  function finishDeploy() {
+    deploying = false;
+    setButtonsEnabled(true);
+    listEl.querySelectorAll('button').forEach(b => { b.textContent = '部署'; });
+    loadStatus();
+  }
+
+  function setButtonsEnabled(enabled) {
+    refreshBtn.disabled = !enabled;
+    listEl.querySelectorAll('button').forEach(b => { b.disabled = !enabled; });
+  }
+
+  function appendLog(text, level) {
+    const span = document.createElement('span');
+    if (level && level !== 'info') span.className = level;
+    span.textContent = text;
+    logEl.appendChild(span);
     logEl.scrollTop = logEl.scrollHeight;
   }
 
   refreshBtn.onclick = () => loadProjects(true);
+  loadStatus();
   loadProjects();
 </script>
 </body>
