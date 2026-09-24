@@ -15,11 +15,11 @@ Reimilia 本身**只用 Python 标准库**，唯一的构建期依赖就是 PyIn
 
 脚本会：
 
-1. 建一个构建用虚拟环境 `.venv-build/`（Debian/Ubuntu 的 PEP 668
-   「externally-managed-environment」限制会挡住直接 `pip install`，用 venv 绕过去）；
-2. 装 `pyinstaller>=6.0`；
-3. 语法自检 → 调 `Reimilia.spec` 打包；
-4. 冒烟测试 `dist/reimilia --version` 与 `--show-config`。
+1. 建一个构建用虚拟环境 `.venv-build/`；
+2. 确认里面有 pip（**没有就自动补**，见下面「Debian/Ubuntu 没有 pip」）；
+3. 装 `pyinstaller>=6.0`；
+4. 语法自检 → 调 `Reimilia.spec` 打包；
+5. 冒烟测试 `dist/reimilia --version` 与 `--show-config`。
 
 产物：`dist/reimilia`。
 
@@ -27,9 +27,46 @@ Reimilia 本身**只用 Python 标准库**，唯一的构建期依赖就是 PyIn
 
 ```bash
 ./build.sh --no-venv          # 用当前环境里已有的 PyInstaller
+./build.sh --recreate-venv    # 删掉旧 venv 重建
 PYTHON=python3.12 ./build.sh  # 指定解释器
 VENV_DIR=/tmp/venv ./build.sh # 换个 venv 位置
 ```
+
+### Debian/Ubuntu 没有 pip 怎么办
+
+`python3 -m venv` 依赖 `python3-venv` 提供的 `ensurepip`。
+Debian/Ubuntu 默认**不装**这个包，此时 `python3 -m venv` 会报：
+
+```
+The virtual environment was not created successfully because ensurepip is not
+available.  On Debian/Ubuntu systems, you need to install the python3-venv
+package ...
+```
+
+而且这条消息是打到 **stdout** 的，看起来很像脚本崩了；更坑的是它可能
+留下一个**没有 pip、也没有 `activate`** 的半成品目录。
+
+`build.sh` 会自动处理这种情况，**不需要 root**：
+
+1. 先探测 `import ensurepip`，缺了就用 `python3 -m venv --without-pip` 建环境；
+2. 再用 `ensurepip`（若可用）或官方 `get-pip.py` 把 pip 引导进去；
+3. 然后正常装 PyInstaller、打包。
+
+所以在没装 `python3-venv` 的 Debian 13 上，`./build.sh` 也能一次跑通。
+
+想省掉每次引导 pip 的步骤，还是建议装上：
+
+```bash
+sudo apt install python3-venv        # Debian / Ubuntu
+sudo dnf install python3-virtualenv  # Fedora / RHEL
+sudo pacman -S python-virtualenv     # Arch
+```
+
+### 为什么不用 `source bin/activate`
+
+因为 `python3 -m venv` 失败时会留下没有 `activate` 的半成品目录，
+`source .venv-build/bin/activate` 会直接报「没有那个文件或目录」并中断。
+脚本一律用 `.venv-build/bin/python` 绝对路径调用，不依赖 `activate`。
 
 ---
 
@@ -37,9 +74,8 @@ VENV_DIR=/tmp/venv ./build.sh # 换个 venv 位置
 
 ```bash
 python3 -m venv .venv-build
-. .venv-build/bin/activate
-pip install "pyinstaller>=6.0"
-pyinstaller --clean --noconfirm Reimilia.spec
+.venv-build/bin/python -m pip install "pyinstaller>=6.0"
+.venv-build/bin/python -m PyInstaller --clean --noconfirm Reimilia.spec
 ./dist/reimilia --version
 ```
 
@@ -117,8 +153,17 @@ reimilia --cli --list    # 列出可部署项目
 
 ## 故障排查
 
+**`ensurepip is not available` / venv 里没有 pip / 没有 activate**
+Debian/Ubuntu 没装 `python3-venv`。`./build.sh` 会自动用
+`--without-pip` + `get-pip.py` 绕过（不需要 root）；要一劳永逸就
+`sudo apt install python3-venv`。细节见上面「Debian/Ubuntu 没有 pip 怎么办」。
+
 **`No module named PyInstaller`**
-venv 没激活，或者装到了系统 Python 上被 PEP 668 拦了。用 `./build.sh` 走 venv。
+多半是 venv 没建好或 pip 装到了别的环境。直接跑 `./build.sh`，
+它会自己建环境、补 pip、装 PyInstaller。
+
+**`Reimilia.spec` 报 `PYZ() got an unexpected keyword argument`**
+PyInstaller 版本低于 6.0。升级：`./build.sh` 会自动检查并报出版本差异。
 
 **`ModuleNotFoundError: reimilia` 运行时报错**
 打包时 `Analysis(['main.py'])` 需要能 import 到 `reimilia/` 包。
@@ -137,4 +182,10 @@ PyInstaller 产物依赖目标机器的 glibc 版本：在较新的发行版上�
 
 ```bash
 reimilia --show-config | head -4      # frozen: yes / no
+```
+
+**想从头再来一遍**
+
+```bash
+rm -rf .venv-build build dist && ./build.sh --recreate-venv
 ```
